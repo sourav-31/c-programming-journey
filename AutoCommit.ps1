@@ -1,39 +1,51 @@
+# ================================
 # AutoCommit.ps1
+# Commits each .c file separately
+# ================================
 
-$changes = git status --porcelain
+Write-Host "Searching for C files..." -ForegroundColor Cyan
 
-if (-not $changes) {
-    Write-Host "No changes found."
+# Get all new or modified .c files
+$files = git ls-files --others --modified --exclude-standard "*.c"
+
+if (!$files) {
+    Write-Host "No new or modified .c files found." -ForegroundColor Yellow
     exit
 }
 
-foreach ($line in $changes) {
+$count = ($files | Measure-Object).Count
+Write-Host "Found $count file(s)." -ForegroundColor Green
 
-    $status = $line.Substring(0,2).Trim()
-    $file = $line.Substring(3).Trim('"')
+$i = 1
 
-    # Only process .c files
-    if (-not $file.EndsWith(".c")) {
-        continue
-    }
+foreach ($file in $files) {
 
-    Write-Host "Committing $file"
+    Write-Host ""
+    Write-Host "[$i/$count] Processing: $file" -ForegroundColor Cyan
 
+    # Stage only this file
     git add -- "$file"
 
+    # Get filename without extension
     $name = [System.IO.Path]::GetFileNameWithoutExtension($file)
 
+    # Check if file is already tracked
+    git ls-files --error-unmatch "$file" *> $null
+
     if ($LASTEXITCODE -eq 0) {
-        if ($status -eq "??") {
-            git commit -m "Add $name"
-        }
-        else {
-            git commit -m "Update $name"
-        }
+        git commit -m "Update $name"
     }
+    else {
+        git commit -m "Add $name"
+    }
+
+    $i++
 }
 
-Write-Host "Pushing..."
+Write-Host ""
+Write-Host "Pushing commits..." -ForegroundColor Cyan
+
 git push origin main
 
-Write-Host "Done!"
+Write-Host ""
+Write-Host "Completed successfully!" -ForegroundColor Green
